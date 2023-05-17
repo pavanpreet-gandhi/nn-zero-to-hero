@@ -1,4 +1,4 @@
-# neural-networks-course-companion
+# nn-zero-to-hero
 This is a repository that contains all the files and notebooks as I followed along in Andrej Karpathy's [Neural Networks: Zero to Hero](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ) course on YouTube.
 
 ## Micrograd
