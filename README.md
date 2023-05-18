@@ -31,16 +31,17 @@ This is a repository that contains all the files and notebooks as I followed alo
 - ### Bigrams and Ngrams:
     - A bigram is a pair of consecutive written units (characters, words, tokens, etc.)
     - A bigram language model counts up all the bigrams in the training data, and then uses these counts to create **probability distributions** for the next character given teh current character.
-    - An Ngram is just like a bigram but with N previous characters. An Ngram language models works just like a bigram language model but takes a longer character history as the input.
+    - An Ngram is just like a bigram but with N previous characters. An Ngram language model works just like a bigram language model but takes a longer character history as the input.
     - The Ngram language model is **not scalable** to longer inputs since it requires us to store exponentially more Ngram counts as N increases.
 - ### Neural network:
     - Instead of using the bigram counts to predict the next character, we can use a neural network.
     - The main advantage of using neural networks over Ngrams is that they will be able to **scale better with longer inputs**.
-    - The neural network is trained using the **average negative log likelihood loss** and **gradient descent**:
+    - These neural network are trained using **average negative log likelihood loss** and **gradient descent**:
         - [Maximum likelihood estimation](https://en.wikipedia.org/wiki/Maximum_likelihood_estimation) is a method of estimating the parameters of an assumed probability distribution, given some observed data. 
         - This is achieved by maximizing a **likelihood function** w.r.t. the model parameters so that, under the assumed statistical model, the observed data is most probable.
         - The logic of maximum likelihood is both intuitive and flexible, and as such the method has become a dominant means of statistical inference.
         - Maximize the likelihood $\iff$ Maximize the log likelihood $\iff$ Minimize the negative log likelihood $\iff$ Minimize the average negative log likelihood (loss)
+        - This minimization is done by gradient descent in the case of a neural network.
     - The input of the neural network is a **one-hot-encoding** of the characters.
     - The output of the neural network is **logits** (i.e. log-counts). We can use the **softmax function** to convert a vector of logits into a **probability distribution**.
     - The model can be smoothened (output probability distributions are more uniform), by adding **regularization** to the loss function.
