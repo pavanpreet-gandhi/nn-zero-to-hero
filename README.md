@@ -127,3 +127,42 @@ Similar to [A Neural Probabilistic Langauge Model](https://www.youtube.com/redir
         - Standard deviation of gradients of weights/biases
         - `gradient:data` ratio: This is the ratio of standard deviation of gradients of weights to standard deviation of weights.
         - `update:data` ratio: This is the ratio of standard deviation of gradients of weights times learning rate to standard deviation of weights. We want a **update:data** ratio of about `0.001`. Use this ratio to find an appropriate learning rate.
+
+## Backpropagation Ninja
+- Why should we understand backpropagation? See [this article](https://karpathy.medium.com/yes-you-should-understand-backprop-e2f06eab496b). 
+- TL;DR: Vanishing gradients, dead neurons, exploding gradients.
+- Tips for implementing backpropagation manually:
+    - Addition: `dsomething = 1 * dlocal_output = dlocal_output` (think of this as routing the derivative through).
+    - Multiplication: `dsomething = otherthing * dlocal_output` (think of these as each thing controls the strength of the other things derivative).
+    - In general: `dsomething = local_derivative * dlocal_output` (`local_derivative` is *usually* in terms of `something`)
+    - The shape of `something` and `dsomething` are the same, use this property to figure out how to backpropagate based on the inputs and the chain rule.
+        - There is only one way to get the right dimension for backpropagating through `@`, and it involves a `.T` operation.
+        - When broadcasting is happening, there will be a `sum` operation in the backpropagation (located after multiplying by `dlocal_output`).
+    - It is often useful to **write out the shapes of the inputs and outputs** when backpropagating through a segment of the computational graph.
+- **Geometric interpretation of `dlogits`:** The gradient represents a pulling force of where we want the weights to go. The force sums to zero accross each row.
+- See [this page](https://cs231n.github.io/optimization-2/) to read more. Here is a useful snippet:
+    - The add gate always takes the gradient on its output and distributes it equally to all of its inputs, regardless of what their values were during the forward pass. This follows from the fact that the local gradient for the add operation is simply +1.0, so the gradients on all inputs will exactly equal the gradients on the output because it will be multiplied by x1.0 (and remain unchanged).
+    - The max gate routes the gradient. Unlike the add gate which distributed the gradient unchanged to all its inputs, the max gate distributes the gradient (unchanged) to exactly one of its inputs (the input that had the highest value during the forward pass). This is because the local gradient for a max gate is 1.0 for the highest value, and 0.0 for all other values.
+    - The multiply gate is a little less easy to interpret. Its local gradients are the input values (except switched), and this is multiplied by the gradient on its output during the chain rule. 
+    - *Unintuitive effects and their consequences.* Notice that if one of the inputs to the multiply gate is very small and the other is very big, then the multiply gate will do something slightly unintuitive: it will assign a relatively huge gradient to the small input and a tiny gradient to the large input. Note that in linear classifiers where the weights are dot producted $w^T x_i$ (multiplied) with the inputs, this implies that the scale of the data has an effect on the magnitude of the gradient for the weights. For example, if you multiplied all input data examples $x_i$ by 1000 during preprocessing, then the gradient on the weights will be 1000 times larger, and you’d have to lower the learning rate by that factor to compensate. This is why preprocessing matters a lot, sometimes in subtle ways! And having intuitive understanding for how the gradients flow can help you debug some of these cases.
+
+## WaveNet
+- ### Average loss:
+  - Instead of plotting the loss directly, it is often more useful to plot the average loss over multiple steps since this eliminates the noise due to minibatches. 
+  - This can be achieved as follows: `plt.plot(torch.tensor(lossi).view(-1, 1000).mean(dim=1));`.
+- ### PyTorch-ification:
+  - The modules that we have implemented are very similar to `torch.nn` which is a neural networks API that is built ontop of `torch.tensor`.
+  - Each layer can be wrapped up in a PyTorch style `nn.Module` container with the following methods: `__init__`, `__call__`, and `parameters`.
+  - The layers can be stacked with a Pytorch style `nn.Sequential` container, which sequentially calls a list of layers. This allows us to wrap the whole network in a single container.
+- ### Matrix multiplication of higher order tensors:
+  - The matrix multiplication operation in PyTorch is quite powerful, and works with higher order tensors as well (not just matrices). The matrix multiplication acts only on the last dimension (and all the other dimensions remain unchanged). This is effectively like **adding more batch dimensions**.
+  - E.g `(4, 5, 80) @ (80, 200) + (200,) = (4, 5, 200)`; where `(4, 5, 80)` is the input to the layer, `(80, 200)` are the weights, `(200,)` is the bias, and `(4, 5, 80)` is the output of the layer. In this example, the dimensions at index 0 and 1 are treated as batch dimensions, and the matrix multiplication acts on dimension 2.
+- ### Original WaveNet paper:
+  - The original WaveNet paper uses **convolutions over a single training sequence** to make training more **efficient** (in our case this is a single name from the training set). The network is convolved with the training sequence so that the overlapping outputs of the intermediate layers can be reused and the GPU can perform calculations in paralell. 
+  - See *figure 3* from the [original wavenet paper](https://arxiv.org/pdf/1609.03499.pdf) (this is what we implemented).
+  - What we have implemented is a heirachical neural network.
+- ### Deep learning development process:
+  - The development process of neural networks usually involves lots of reading of the PyTorch documentation, especiallly about dimension sizes and implementation details. Note that the documentation is is sometimes inaccurate.
+  - There's a lot of stuff to do with shapes of tensors. It is often helpful to develop in a jupyter notebook, and then move the code over to python files to do experimentation.
+  - Normally you look at the training and validation loss together and optimize on hyperparameters. This involves hyperparameter searches, python scripts with lots of arguments, lots of running experiments, looking at lots of plots, etc. all to see what works well and what doesn't.
+  - In other words you would be working on the **population level** and this is what's referred to as a **training harness**. Setting this up and making it work well is a whole other topic.
