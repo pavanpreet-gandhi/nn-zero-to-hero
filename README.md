@@ -1,5 +1,5 @@
 # Neural Networks: Zero to Hero
-This is a repository that contains all the files and notebooks as I followed along in Andrej Karpathy's [Neural Networks: Zero to Hero](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ) course on YouTube.
+This is a repository that contains all the files and notebooks as I followed along in Andrej Karpathy's [Neural Networks: Zero to Hero](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ) on YouTube.
 
 ## Micrograd
 - We can represent mathematical functions as **computation graphs**. 
@@ -166,3 +166,103 @@ Similar to [A Neural Probabilistic Langauge Model](https://www.youtube.com/redir
   - There's a lot of stuff to do with shapes of tensors. It is often helpful to develop in a jupyter notebook, and then move the code over to python files to do experimentation.
   - Normally you look at the training and validation loss together and optimize on hyperparameters. This involves hyperparameter searches, python scripts with lots of arguments, lots of running experiments, looking at lots of plots, etc. all to see what works well and what doesn't.
   - In other words you would be working on the **population level** and this is what's referred to as a **training harness**. Setting this up and making it work well is a whole other topic.
+
+## LSTM
+- ### RNNs are more flexible
+  - Vanilla Neural Networks (and even Convolutional Networks) are limited.
+    - They can only accept a fixed-sized vector as input.
+    - They can only produce a fixed-sized vector as output.
+    - This mapping is done with a fixed number of computational steps.
+  - On the other hand, Recurrent Neural Networks (in their most general form) are able to accept **variable length inputs**, produce **variable length outputs**, and even **vary the number of computational steps** for different lengths.
+- ### Classification of RNNs
+  - RNNs can be classified into **5 types** depending on the input and output lengths (see the image in the reference blogpost for a visual explanation):
+    - **One-to-one:** this is just a Vanilla Neural Network.
+    - **One-to-many:** e.g. image captining (fixed size image to variable size caption).
+    - **Many-to-one:** e.g sentiment analysis (variable sized text to binary sentiment).
+    - **Many-to-many (asynced):** e.g machine translation (variable sized input sequence and output sequence).
+    - **Many-to-many (synced):** e.g video classification (variable sized input sequence, output sequence is same size as input sequence).
+  - Note that a sequence refers to a sequence of vectors. The sequence has variable length but the size of each vector in the sequence is fixed.
+- ### Optimizing over functions
+  - The ability for RNNs to **vary the number of computational steps (while maintaining the same number of learnable parameters)** is where the magic happens.
+  - **RNNs are Turing-Complete** (but similar to universal approximation theorems for neural nets you shouldn’t read too much into this. In fact, forget I said anything.)
+  - If training vanilla neural nets is optimization over functions, training recurrent nets is optimization over programs.
+- ### Sequential processing in absence of sequences
+  - You might be thinking that having sequences as inputs or outputs could be relatively rare.
+  - However, even if your inputs/outputs are fixed vectors, it is still possible to use this powerful formalism to **process them in a sequential manner**.
+  - You’re learning stateful programs that process your fixed-sized data.
+
+## Transformer
+- ### Tokenizer
+    - Tokenizers convert between text data and integer encodings by dividing the text up into tokens.
+    - Here we used a character level tokenizer (each character is a unique integer), however in practice people usually use **sub-word level tokenizers**.
+    - They have **larger vocabulary sizes**, but use **fewer numbers** to represent a given text.
+    - There is a **tradeoff** between vocabulary size and representation size. 
+    - Popular **sub-word tokenizers** are [sentencepiece](https://github.com/google/sentencepiece) and [tiktoken](https://github.com/openai/tiktoken).
+- ### Batches
+    - The model is trained in minibatches of encoded sequences of text.
+    - Each batch has 2 dimensions. The first dimension is the *batch* dimension, and the second dimension is the *time* dimension.
+    - The transformer learns to predict the target given context of any length up to `block_size`. 
+    - This is not just for efficiency, and is infact necessery for inference since the transformer will need to be able to generate text from scratch (with no context, then context of length 1, and so on...).
+- ### Averaging with matrices
+    - The notebook illustrates a mathematical trick where we can "average" using matrix multiplication instead of using for loops. 
+    - This can also be extended to weighted averages very easily. Here the weights are normalized to sum to one and not look into the future of the time dimension.
+    - *Version 3* is especially useful since it startes with "affinities" between different tokens, and they can be data dependant instead of just being set to zero.
+    <br>`affinities = torch.zeros((T, T)) # affinities between tokens `
+    <br> `tril = torch.tril(torch.ones(T, T))`
+    <br> `weights = affinities.masked_fill(tril==0, float('-inf')) # prevent lookahead`
+    <br> `weights = F.softmax(weights, dim=1)as before`
+    <br> `xbow3 = weights @ x`
+- ### Self-attention
+    - #### Crux of self-attention
+        - Every token will emit three vectors - **query**, **key**, and **value**
+        - The key tells other tokens what it *has*, and the query tells other tokens what it's *looking for*.
+        - The value contains the *information* of the token that is relevant for other tokens.
+        - The **dot product** between a key and query for a token pair become the *affinities* between tokens i.e. how interested is one token with another.
+        - For example, a pronoun could be looking for a noun, so the dot product between the query of the pronoun and the key of the noun could be high.
+        - The model then computes the weight matrix by performing softmax on the masked affinities.
+        - This weight matrix is then multiplied with the values of all the tokens to produce the output of the self-attention layer.
+    - #### Additional notes
+        - Attention is a **communication mechanism**. Can be seen as nodes in a directed graph looking at each other and aggregating information with a weighted sum from all nodes that point to them, with data-dependent weights.
+        - There is no notion of space. Attention simply acts over a set of vectors. This is why we need to **positionally encode tokens**.
+        - Each example across batch dimension is of course processed completely independently and never "talk" to each other
+        - In an **encoder** attention block just delete the single line that does masking with `tril`, allowing all tokens to communicate. This block here is called a **decoder** attention block because it has triangular masking, and is usually used in autoregressive settings, like language modeling.
+        - **Scaled attention** additionally divides the `weights` by 1/sqrt(head_size). This makes it so when input `k`, `q` are unit variance, `weights` will be unit variance too and Softmax will stay diffuse and not saturate too much. This prevents Softmax from converging to one-hot vectors.
+- ### Additional optimizations
+    - #### **Multi-head attention**
+        - Often, the tokens often "have a lot to talk about". This communication can be facillitated by multiple attention heads between the same tokens.
+        - For example one of the heads could be looking for consonants, while the other could be looking for vowels, etc.
+        - The final output is a concatination between all the attention heads.
+    - #### **Communication and computation**
+        - It is often useful to let the network **"think over"** the outputs of the attention blocks. This can be achieved by adding more **computation** steps using feed-forward layers. 
+        - Infact a common architechure is to **intersperse** the attention blocks, that allow communication between tokens, with feed-forward blocks, that allow tokens to individually process the results of this communication.
+    - #### **Skip/residual connections**
+        - Deep neural networks often suffer from optimization issues due to vanishing gradients. Skip connections (a.k.a. residual connections) help with this.
+        - The main concept is that you "branch" the data off to transform the data in some way, but also add the non-transformed version back to the "main branch". 
+        - Since addition routes gradients, this creates a "gradient super-highway" that allows gradients to backpropagate more effectively to the earlier layers. 
+        - The "branches" off the highway are where the computation happens, and they are initialized in such a way that they barely contribute any gradients, but eventually they become more relevant as training goes on.
+    - #### **LayerNorm**
+        - This is another innovation that helps with numerical stability of the gradients during optimization of deep neural networks.
+        - The idea is the same as BatchNorm, we want every neuron to have unit gaussian outputs. 
+        - However instead of normalizing over the batch dimension, we normalize over the time dimension. 
+        - This is better than BatchNorm since batches are no longer coupled together and we don't need to keep track of training vs testing.
+        - The transformer architechture has stood the test of time and has remained relatively unchanged for quite some time since it's introduction in 2017. One change that was made was the pre-norm formulation that adds a LayerNorm before the transformer block, and another one before the feed-forward block.
+    - #### **Dropout**
+        - This is a regularization technique that helps prevent overfitting.
+        - Every forward pass, a random subset of neurons are disabled, so only a subset of the network is trained in each optimization step.
+        - This has the effect of training an ensemble of networks that are merged together at test time.
+- ### Cross-attention
+    - Self-attention just means that the keys and values are produced from the same source as queries. In **cross-attention**, the queries still get produced from x, but the keys and values come from some other, external source (e.g. an encoder module)
+    - When we want the generated text to be conditioned on some previous text, we can use an encoder transformer blocks (without the traingular mask), to generate the keys and values, and a decoder transformer block to generate the queries.
+    - These can be combined to form an encoder-decoder transformer. See the [attention is all you need](https://arxiv.org/abs/1706.03762) paper for more details.
+- ### How to train ChatGPT
+    - #### Stage 1: **Pretraining**
+        - The first stage is to train a decoder transformer langauge model on all the data from the internet that simply learns to babble on
+        - Here we trained a character level model with 10 million parameters on a dataset with 1 million character level tokens tokens which would be about 300,000 tokens in the OpenAI vocabulary.
+        - The biggest OpenAI GPT 3 transformer has 175 billion parameters on 300 billion tokens. These numbers are not even large compared to current standards. See OpenAI's [GPT-3 paper](https://arxiv.org/abs/2005.14165) for more details.
+        - Due to scale, this becomes a massive infrastructure challenge.
+    - #### Stage 2: **Fine-tuning**
+        - So far the pre-trained model will just autocomplete and babble pretty much anything. It could complete the sentence, it could write a news article, it could ask more questions, pretty much anything that it sees on the internet.
+        - The next stage is to "align it" to be an assistant. See this [blog post](https://openai.com/blog/chatgpt) by OpenAI for more information.
+        - Step 1 fine-tunes this model based on a small dataset of good example "question-answer" pairs. This works because pre-trained LLMs are very sample efficient.
+        - Step 2 trains a reward model by asking humans to rank different responses from bad to good. This reward model is a way to score any response.
+        - Step 3 uses the PPO a reinforcement learning algorithm to further fine-tune the model based on the reward model.
