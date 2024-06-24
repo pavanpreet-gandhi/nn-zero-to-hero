@@ -76,6 +76,7 @@ class Head(nn.Module):
     # compute weights
     weights = affinities.masked_fill(self.tril[:T, :T]==0, float('-inf')) # type: ignore
     # TODO why did accidentally making the softmax dim=1 reduce the loss dramatically, is it look because of look ahead?
+    # TODO: Understand the relationship between each individual weight and the output
     weights = F.softmax(weights, dim=-1) # (B, T, T)
     weights = self.dropout(weights) # randomly prevent some of the nodes (tokens) from communicating
     # perform weighted aggregation of the vlaues
