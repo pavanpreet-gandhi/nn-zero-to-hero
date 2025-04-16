@@ -1,5 +1,5 @@
 # Neural Networks: Zero to Hero
-This is a repository that contains all the files and notebooks as I followed along in Andrej Karpathy's [Neural Networks: Zero to Hero](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ) on YouTube.
+This is a repository that contains all the files and notebooks as I followed along in Andrej Karpathy's [Neural Networks: Zero to Hero](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ) on YouTube. Below are the notes I made along the way:
 
 ## Micrograd
 - We can represent mathematical functions as **computation graphs**. 
